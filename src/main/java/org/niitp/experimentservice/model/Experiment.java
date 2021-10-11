@@ -20,6 +20,5 @@ public class Experiment {
     @Id
     private String id;
     private String name;
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date date = new Date();
 }
