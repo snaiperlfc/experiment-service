@@ -3,12 +3,12 @@ package org.niitp.experimentservice.controller;
 import lombok.extern.slf4j.Slf4j;
 import org.niitp.experimentservice.model.Experiment;
 import org.niitp.experimentservice.service.ExperimentService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @RestController
 @Slf4j
@@ -28,8 +28,15 @@ public class ExperimentController {
     }
 
     @PostMapping
-    public ResponseEntity<?> addExperiment(@RequestBody Experiment experiment) {
-        return experimentService.addExperiment(experiment) ? ResponseEntity.status(HttpStatus.CREATED).build() : ResponseEntity.badRequest().build();
+    @ResponseStatus(HttpStatus.CREATED)
+    public Mono<Experiment> addExperiment(@RequestBody Experiment experiment) {
+        log.info("Add experiment: {}", experiment);
+        return experimentService.addExperiment(experiment);
+    }
+
+    @GetMapping(value = "/{id}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<Experiment> getExperimentById(@PathVariable String id) {
+        return experimentService.getExperimentById(id);
     }
 
 }
