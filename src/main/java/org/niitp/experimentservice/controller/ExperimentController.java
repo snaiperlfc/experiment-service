@@ -12,7 +12,7 @@ import reactor.core.publisher.Mono;
 
 @RestController
 @Slf4j
-@RequestMapping("/experiment")
+@RequestMapping("/experiments")
 public class ExperimentController {
 
     final
