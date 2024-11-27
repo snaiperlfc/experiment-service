@@ -42,9 +42,6 @@ class ExperimentServiceApplicationTests {
     @Autowired
     private WebTestClient webTestClient;
 
-    @LocalServerPort
-    private int localServerPort;
-
     @BeforeAll
     static void startContainers() {
         mongoDBContainer.start();
