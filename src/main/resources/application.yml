@@ -7,6 +7,13 @@ spring:
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Europe/Moscow
+#SWAGGER
+springdoc:
+#  swagger-ui:
+#    path: /swagger-ui.html  # This sets the URL to access Swagger UI.
+  api-docs:
+    path: /v3/api-docs  # This sets the path to the generated OpenAPI documentation.
+
 
 ---
 spring:
@@ -15,3 +22,10 @@ spring:
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Europe/Moscow
+#SWAGGER
+springdoc:
+#  swagger-ui:
+#    path: /swagger-ui.html  # This sets the URL to access Swagger UI.
+  api-docs:
+    path: /v3/api-docs  # This sets the path to the generated OpenAPI documentation.
+
