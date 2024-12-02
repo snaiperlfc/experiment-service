@@ -1,14 +1,10 @@
 package org.niitp.experimentservice;
 
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.niitp.experimentservice.model.Experiment;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.*;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -17,13 +13,13 @@ import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureWebTestClient
 @Testcontainers
@@ -53,6 +49,7 @@ class ExperimentServiceApplicationTests {
     }
 
     @Test
+    @Order(1)
     public void addExperiment() throws Exception {
         String experiment = """
                 {
@@ -86,6 +83,7 @@ class ExperimentServiceApplicationTests {
     }
 
     @Test
+    @Order(2)
     public void getExperimentById() throws Exception {
 
         webTestClient.get()
@@ -95,6 +93,7 @@ class ExperimentServiceApplicationTests {
     }
 
     @Test
+    @Order(3)
     public void testIndexStreaming() {
         Flux<Experiment> experimentFlux = webTestClient.get()
                 .uri("/experiments")
@@ -112,5 +111,37 @@ class ExperimentServiceApplicationTests {
                 .thenCancel()
                 .verify(Duration.ofSeconds(10)); // Adjust main timeout duration
     }
+
+    @Test
+    @Order(4)
+    public void updateTimePoints() {
+        String newTimePoints = """
+            [
+                {
+                    "name": "point 3",
+                    "description": "started another process",
+                    "date_time": "2024-11-27T02:30:00.000+03:00"
+                },
+                {
+                    "name": "point 4",
+                    "description": "ended another process",
+                    "date_time": "2024-11-27T02:35:00.000+03:00"
+                }
+            ]
+            """;
+
+        webTestClient.put()
+                .uri("/experiments/{id}/time_points", createdExperiment.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(newTimePoints)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(Experiment.class)
+                .value(updatedExperiment -> {
+                    assertNotNull(updatedExperiment);
+                    assertEquals(4, updatedExperiment.getTimePoints().size());
+                });
+    }
+
 }
 
