@@ -6,8 +6,6 @@ import org.springframework.data.mongodb.repository.config.EnableReactiveMongoRep
 import org.springframework.scheduling.annotation.EnableAsync;
 
 @SpringBootApplication
-@EnableReactiveMongoRepositories
-@EnableAsync
 public class ExperimentServiceApplication {
 
     public static void main(String[] args) {

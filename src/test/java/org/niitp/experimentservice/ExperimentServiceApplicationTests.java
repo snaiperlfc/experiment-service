@@ -3,25 +3,30 @@ package org.niitp.experimentservice;
 import org.junit.jupiter.api.*;
 import org.niitp.experimentservice.model.Experiment;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.*;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import reactor.core.publisher.Flux;
-import reactor.test.StepVerifier;
+import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@AutoConfigureWebTestClient
+@AutoConfigureMockMvc
 @Testcontainers
 class ExperimentServiceApplicationTests {
 
@@ -36,7 +41,7 @@ class ExperimentServiceApplicationTests {
     }
 
     @Autowired
-    private WebTestClient webTestClient;
+    private MockMvc mockMvc;
 
     @BeforeAll
     static void startContainers() {
@@ -51,97 +56,97 @@ class ExperimentServiceApplicationTests {
     @Test
     @Order(1)
     public void addExperiment() throws Exception {
-        String experiment = """
+        String experimentJson = """
                 {
-                   "name": "work1",
-                   "description": "некие работы",
-                   "date_time_start": "2024-11-27T02:25:11.000+03:00",
-                   "date_time_finish": "2024-11-27T02:25:14.000+03:00",
-                   "time_points": [
-                     {
-                       "name": "point 1",
-                       "description": "включили насос",
-                       "date_time": "2024-11-27T02:25:12.000+03:00"
-                     },
-                     {
-                       "name": "point 2",
-                       "description": "выключили насос",
-                       "date_time": "2024-11-27T02:25:13.000+03:00"
-                     }
-                   ]
-                 }""";
+                    "name": "work1",
+                    "description": "Some experiment description",
+                    "date_time_start": "2024-11-27T02:25:11.000+03:00",
+                    "date_time_finish": "2024-11-27T02:25:14.000+03:00",
+                    "time_points": [
+                        {
+                            "name": "point 1",
+                            "description": "started the process",
+                            "date_time": "2024-11-27T02:25:12.000+03:00"
+                        },
+                        {
+                            "name": "point 2",
+                            "description": "ended the process",
+                            "date_time": "2024-11-27T02:25:13.000+03:00"
+                        }
+                    ]
+                }
+                """;
 
-        createdExperiment = webTestClient.post()
-                .uri("/experiments")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(experiment)
-                .exchange()
-                .expectStatus().isCreated()
-                .returnResult(Experiment.class)
-                .getResponseBody()
-                .blockFirst();
+        // Perform the POST request
+        String createdExperimentString = mockMvc.perform(post("/experiments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(experimentJson))
+                .andExpect(status().isCreated()) // Status should be 201 Created
+                .andExpect(jsonPath("$.name").value("work1")) // Verifying that the name field in the response is "work1"
+                .andExpect(jsonPath("$.description").value("Some experiment description")) // Verifying description
+                .andExpect(jsonPath("$.time_points.length()").value(2)) // Verifying the number of time points
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        createdExperiment = objectMapper.readValue(createdExperimentString, Experiment.class);
+        assertNotNull(createdExperiment.getId());
     }
 
     @Test
     @Order(2)
     public void getExperimentById() throws Exception {
-
-        webTestClient.get()
-                .uri("/experiments/{id}", createdExperiment.getId())
-                .exchange()
-                .expectStatus().isOk();
+        mockMvc.perform(get("/experiments/{id}", createdExperiment.getId()))
+                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.id").value(createdExperiment.getId()));
     }
+
 
     @Test
     @Order(3)
-    public void testIndexStreaming() {
-        Flux<Experiment> experimentFlux = webTestClient.get()
-                .uri("/experiments")
-                .accept(MediaType.TEXT_EVENT_STREAM)
-                .exchange()
-                .expectStatus().isOk()
-                .returnResult(Experiment.class)
-                .getResponseBody();
+    public void getExperiments() throws Exception {
+        // Perform the GET request to /experiments
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/experiments")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isOk()) // Assert status code 200
+                .andExpect(MockMvcResultMatchers.jsonPath("$.length()").value(1)) // Assert the list length
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].name").value("work1")) // Assert the first experiment's name
+                .andReturn();
 
-        StepVerifier.create(experimentFlux)
-                .thenRequest(1)
-                .expectNextCount(1) // Adjust based on expected number of elements
-                .thenAwait(Duration.ofSeconds(5)) // Increase this duration if necessary
-                .expectNextCount(1) // Additional verification or adjust count
-                .thenCancel()
-                .verify(Duration.ofSeconds(10)); // Adjust main timeout duration
+        // Optionally, you can print out the response for debugging
+        String responseContent = result.getResponse().getContentAsString();
+        System.out.println(responseContent);
     }
+
 
     @Test
     @Order(4)
-    public void updateTimePoints() {
+    public void updateTimePoints() throws Exception {
         String newTimePoints = """
-            [
-                {
-                    "name": "point 3",
-                    "description": "started another process",
-                    "date_time": "2024-11-27T02:30:00.000+03:00"
-                },
-                {
-                    "name": "point 4",
-                    "description": "ended another process",
-                    "date_time": "2024-11-27T02:35:00.000+03:00"
-                }
-            ]
-            """;
+                [
+                    {
+                        "name": "point 3",
+                        "description": "started another process",
+                        "date_time": "2024-11-27T02:30:00.000+03:00"
+                    },
+                    {
+                        "name": "point 4",
+                        "description": "ended another process",
+                        "date_time": "2024-11-27T02:35:00.000+03:00"
+                    }
+                ]
+                """;
 
-        webTestClient.put()
-                .uri("/experiments/{id}/time_points", createdExperiment.getId())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(newTimePoints)
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody(Experiment.class)
-                .value(updatedExperiment -> {
-                    assertNotNull(updatedExperiment);
-                    assertEquals(4, updatedExperiment.getTimePoints().size());
-                });
+        mockMvc.perform(put("/experiments/{id}/time_points", createdExperiment.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(newTimePoints))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.time_points.length()").value(4))  // Verifying the size of timePoints array
+                .andExpect(jsonPath("$.time_points[2].name").value("point 3"))  // Verifying the newly added time point
+                .andExpect(jsonPath("$.time_points[3].name").value("point 4"));  // Verifying the newly added time point
     }
+
 
 }
 

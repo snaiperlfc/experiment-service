@@ -1,55 +1,57 @@
 package org.niitp.experimentservice.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.niitp.experimentservice.model.Experiment;
 import org.niitp.experimentservice.repository.ExperimentRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
-import java.time.Duration;
+import java.util.List;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class ExperimentService {
 
     private final ExperimentRepository experimentRepository;
 
-    public ExperimentService(ExperimentRepository experimentRepository) {
-        this.experimentRepository = experimentRepository;
+    public List<Experiment> getExperiments() {
+        // Blocking call to find all experiments
+        List<Experiment> experiments = experimentRepository.findAll();
+        log.info("Fetched all experiments: {}", experiments);
+        return experiments;
     }
 
-    public Flux<Experiment> getExperiments() {
-        return Flux
-                .interval(Duration.ZERO, Duration.ofSeconds(5))
-                .flatMap(i -> experimentRepository.findAll());
-    }
-
-    public Mono<Experiment> getExperimentById(String id) {
+    public Experiment getExperimentById(String id) {
+        // Blocking call to find experiment by ID
         return experimentRepository.findById(id)
-                .doOnSuccess(exp -> log.info("Fetched experiment by ID: {}", id))
-                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Experiment not found")));
-    }
-
-    public Mono<Experiment> addExperiment(Experiment experiment) {
-        return experimentRepository.insert(experiment)
-                .doOnSuccess(experiment1 -> log.info(experiment1.toString()))
-                .onErrorResume(e -> {
-                    log.error("Error occurred while inserting experiment: {}", e.getMessage());
-                    return Mono.error(e);
+                .orElseThrow(() -> {
+                    log.error("Experiment not found with ID: {}", id);
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, "Experiment not found");
                 });
     }
 
-    public Mono<Experiment> updateExperiment(Experiment experiment) {
-        return experimentRepository.save(experiment)
-                .doOnSuccess(updatedExperiment -> log.info("Updated experiment: {}", updatedExperiment))
-                .onErrorResume(e -> {
-                    log.error("Error occurred while updating experiment: {}", e.getMessage());
-                    return Mono.error(e);
-                });
+    public Experiment addExperiment(Experiment experiment) {
+        try {
+            Experiment savedExperiment = experimentRepository.save(experiment);
+            log.info("Inserted experiment: {}", savedExperiment);
+            return savedExperiment;
+        } catch (Exception e) {
+            log.error("Error occurred while inserting experiment: {}", e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to insert experiment");
+        }
     }
 
-
+    public Experiment updateExperiment(Experiment experiment) {
+        try {
+            Experiment updatedExperiment = experimentRepository.save(experiment);
+            log.info("Updated experiment: {}", updatedExperiment);
+            return updatedExperiment;
+        } catch (Exception e) {
+            log.error("Error occurred while updating experiment: {}", e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to update experiment");
+        }
+    }
 }
