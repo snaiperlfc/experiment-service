@@ -1,37 +1,38 @@
 package org.niitp.experimentservice.controller;
 
-import org.niitp.experimentservice.model.Response;
+import org.niitp.experimentservice.model.ErrorDetails;
+import org.niitp.experimentservice.model.ResourceNotFoundException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.server.ServerWebInputException;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+
+import java.util.Date;
 
 @ControllerAdvice
-public class GlobalExceptionHandler {
-
-    @ExceptionHandler(ServerWebInputException.class)
-    public ResponseEntity<String> handleServerWebInputException(ServerWebInputException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid input: " + ex.getMessage());
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<?> resourceNotFoundException(ResourceNotFoundException ex, WebRequest request) {
+        ErrorDetails errorDetails = new ErrorDetails(new Date(), ex.getMessage(), request.getDescription(false));
+        return new ResponseEntity<>(errorDetails, HttpStatus.NOT_FOUND);
     }
 
-    // Add more exception handling methods for different types of exceptions
-    @ExceptionHandler(ResponseStatusException.class)
-    @ResponseBody
-    public ResponseEntity<Object> handleResponseStatusException(ResponseStatusException ex) {
-        HttpStatusCode status = ex.getStatusCode();
-        String errorMessage = ex.getReason();
-        return new ResponseEntity<>(errorMessage, status);
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<?> globalExceptionHandler(Exception ex, WebRequest request) {
+        ErrorDetails errorDetails = new ErrorDetails(new Date(), ex.getMessage(), request.getDescription(false));
+        return new ResponseEntity<>(errorDetails, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<Response> handleRuntimeException(RuntimeException e) {
-        Response response = Response.builder()
-                .message(e.getMessage())
-                .build();
-        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    @Override
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
+                                                                  HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        ErrorDetails errorDetails = new ErrorDetails(new Date(), "Validation Failed",
+                ex.getBindingResult().toString());
+        return new ResponseEntity<>(errorDetails, HttpStatus.BAD_REQUEST);
     }
 }
